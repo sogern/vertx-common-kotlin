@@ -78,19 +78,16 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
             val profiles = (properties[PROPERTY_APPLICATION_PROFILES]!! as String).split(",").toSet()
 
             // Ref: https://stackoverflow.com/questions/25222327/deserialize-pojos-from-multiple-yaml-documents-in-a-single-file-in-jackson
-            val configs = BufferedInputStream(applicationConfigResources).use { fis ->
+            return BufferedInputStream(applicationConfigResources).use { fis ->
                 val parser = YAMLFactory().createParser(fis)
                 objectMapper.readValues(parser, object : TypeReference<BaseApplicationConfig>() {})
                     .readAll()
                     .filter { config ->
                         config.profiles.contains(DEFAULT_APPLICATION_PROFILE) || profiles.any {
-                            config.profiles.contains(
-                                it
-                            )
+                            config.profiles.contains(it)
                         }
                     }.toList()
             }
-            return configs
         }
 
         private val objectMapper = ObjectMapper()

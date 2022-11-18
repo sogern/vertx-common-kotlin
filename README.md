@@ -15,15 +15,47 @@ Based on Vert.x v4.3, but should be compatible with future v4.x versions.
 ## Including in your project
 Add this project as a Git [submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules):
 ```shell
-git submodule add https://github.com/sogern/vertx-common-kotlin
+git submodule add https://github.com/sogern/vertx-common-kotlin .vertx-common-kotlin
 ```
 
+### Maven
+Add the `build-helper-maven-plugin` to your `pom.xml` and then add the main source folders from
+.vertx-common-kotlin, thus:
+```xml
+<build>
+    <!-- ... -->
+    <plugins>
+        <!-- ... -->
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.3.0</version>
+            <executions>
+                <execution>
+                    <phase>generate-sources</phase>
+                    <goals>
+                        <goal>add-source</goal>
+                    </goals>
+                    <configuration>
+                        <sources>
+                            <source>.vertx-common-kotlin/src/main/kotlin</source>
+                        </sources>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        <!-- ... -->
+    </plugins>
+</build>
+```
 
+TODO: instructions for Gradle projects
 ## Usage
 
 Add `application.yaml` and `logback.xml` files to your `resources` folder.
 Write your verticles and set main class to `dev.sognnes.vertx.impl.core.Launcher`.
-Optionally specify application profile(s) on the command line with `application.profiles` (comma separated list).<br/>
+Optionally specify application profile(s) on the command line with `application.profiles` (comma separated list).
+
 Defining multiple profiles behave in a similar way as Spring Boot, where you can override configurations based on which
 profiles are enabled. I.e. the individual YAML documents are added together based on the list of enabled profiles.
 
@@ -51,7 +83,7 @@ When omitted, the default is `logback.xml`.
 #### Verticles
 A list of Verticle class names. Each must be `enabled` in order to be started.<br/>
 The optional `config` parameter is up to you to define based on your application's needs.<br/>
-It is retrieved in the Verticle's `start` method thus:
+It is retrieved in your Verticle's `start` method thus:
 
 ```kotlin
 override fun start() {
