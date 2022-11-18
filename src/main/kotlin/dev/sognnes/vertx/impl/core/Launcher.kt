@@ -28,7 +28,7 @@ import java.io.BufferedInputStream
 import java.util.*
 
 // Inspiration from: https://github.com/greyseal/vertx-event-bus/blob/master/src/main/java/com/api/scrubber/launcher/ScrubberLauncher.java
-open class VertxLauncher : VertxCommandLauncher(), VertxLifecycleHooks {
+open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
 
     companion object {
         private const val PROPERTY_LOGGER_DELEGATE_FACTORY = io.vertx.core.logging.LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME
@@ -103,14 +103,14 @@ open class VertxLauncher : VertxCommandLauncher(), VertxLifecycleHooks {
 
         private var applicationConfigs = emptyList<BaseApplicationConfig>()
 
-        val instance: VertxLauncher = VertxLauncher()
+        val instance: Launcher = Launcher()
 
         @Override
         @JvmStatic
         fun main(args: Array<String>) {
             val properties = initSystemProperties()
 
-            log = LoggerFactory.getLogger(VertxLauncher::class.java)
+            log = LoggerFactory.getLogger(Launcher::class.java)
             log.debug("Application starting")
             log.debug("Args:\n${args.joinToString(" ")}")
 
@@ -186,7 +186,7 @@ class MainVerticle : CoroutineVerticle() {
     }
 
     override suspend fun start() {
-        val options = VertxLauncher.instance.configRetrieverOptions()
+        val options = Launcher.instance.configRetrieverOptions()
         val retriever = ConfigRetriever.create(vertx, options)
 
         retriever.getConfig {

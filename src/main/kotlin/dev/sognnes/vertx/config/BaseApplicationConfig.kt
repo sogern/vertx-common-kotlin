@@ -1,8 +1,8 @@
 package dev.sognnes.vertx.config
 
 import com.fasterxml.jackson.databind.JsonNode
-import dev.sognnes.vertx.impl.core.VertxLauncher.Companion.DEFAULT_APPLICATION_PROFILE
-import dev.sognnes.vertx.impl.core.VertxLauncher.Companion.DEFAULT_LOGBACK_CONFIGURATION_FILE
+import dev.sognnes.vertx.impl.core.Launcher.Companion.DEFAULT_APPLICATION_PROFILE
+import dev.sognnes.vertx.impl.core.Launcher.Companion.DEFAULT_LOGBACK_CONFIGURATION_FILE
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import java.util.*
