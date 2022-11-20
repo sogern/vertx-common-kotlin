@@ -1,17 +1,46 @@
 package dev.sognnes.vertx.config
 
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.sognnes.vertx.impl.core.Launcher.Companion.DEFAULT_APPLICATION_PROFILE
 import dev.sognnes.vertx.impl.core.Launcher.Companion.DEFAULT_LOGBACK_CONFIGURATION_FILE
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
+import java.io.BufferedInputStream
+import java.io.InputStream
 import java.util.*
 
 open class BaseApplicationConfig(
-    var logging: LoggingConfig,
+    var logging: LoggingConfig = LoggingConfig(),
     var profiles: String = DEFAULT_APPLICATION_PROFILE,
     var verticles: Array<VerticleConfig> = emptyArray(),
 ) {
+    companion object {
+        private val objectMapper = ObjectMapper()
+            .registerKotlinModule()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+
+        fun fromYAML(
+            `is`: InputStream,
+            profiles: Set<String> = setOf(DEFAULT_APPLICATION_PROFILE)
+        ): List<BaseApplicationConfig> = BufferedInputStream(`is`).use { fis ->
+            val parser = YAMLFactory().createParser(fis)
+            objectMapper.readValues(parser, object : TypeReference<BaseApplicationConfig>() {})
+                .readAll()
+                .filter { config ->
+                    config.profiles.contains(DEFAULT_APPLICATION_PROFILE) || profiles.any {
+                        config.profiles.contains(it)
+                    }
+                }.toList()
+        }
+    }
 
     fun toJsonObject(): JsonObject {
         return JsonObject(

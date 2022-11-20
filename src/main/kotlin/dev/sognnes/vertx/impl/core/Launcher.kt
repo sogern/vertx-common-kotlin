@@ -1,11 +1,5 @@
 package dev.sognnes.vertx.impl.core
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.sognnes.vertx.config.BaseApplicationConfig
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
@@ -24,7 +18,8 @@ import io.vertx.kotlin.coroutines.await
 import kotlinx.coroutines.launch
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.BufferedInputStream
+import java.io.FileNotFoundException
+import java.io.InputStream
 import java.util.*
 
 // Inspiration from: https://github.com/greyseal/vertx-event-bus/blob/master/src/main/java/com/api/scrubber/launcher/ScrubberLauncher.java
@@ -32,7 +27,7 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
 
     companion object {
         private const val PROPERTY_LOGGER_DELEGATE_FACTORY = io.vertx.core.logging.LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME
-        private const val PROPERTY_LOGBACK_CONFIGURATION_FILE = ch.qos.logback.classic.util.ContextInitializer.CONFIG_FILE_PROPERTY
+        internal const val PROPERTY_LOGBACK_CONFIGURATION_FILE = ch.qos.logback.classic.util.ContextInitializer.CONFIG_FILE_PROPERTY
         private const val PROPERTY_CONFIG_PATH = "application.config.path"
         private const val PROPERTY_APPLICATION_PROFILES = "application.profiles"
         const val DEFAULT_APPLICATION_PROFILE = "default"
@@ -57,13 +52,18 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
 
         private fun initSystemProperties(): Properties {
             val properties = getPropertiesOrDefault(System.getProperties())
-            applicationConfigs = getApplicationConfigs(properties)
+            properties.putAll(System.getenv())
+            applicationConfigs = getApplicationConfigs(
+                properties,
+                this::class.java.getResourceAsStream("/" + properties[PROPERTY_CONFIG_PATH] as String)
+                    ?: throw FileNotFoundException("File not found: ${properties[PROPERTY_CONFIG_PATH]}")
+            )
             setPropertiesBasedOnConfig(applicationConfigs, properties)
             System.setProperties(properties)
             return properties
         }
 
-        private fun setPropertiesBasedOnConfig(applicationConfigs: List<BaseApplicationConfig>, props: Properties) {
+        internal fun setPropertiesBasedOnConfig(applicationConfigs: List<BaseApplicationConfig>, props: Properties) {
             val logbackConfigFile = applicationConfigs
                 .map { it.logging.config }
                 .lastOrNull { it != DEFAULT_LOGBACK_CONFIGURATION_FILE }
@@ -71,30 +71,12 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
             props[PROPERTY_LOGBACK_CONFIGURATION_FILE] = logbackConfigFile
         }
 
-        private fun getApplicationConfigs(properties: Properties): List<BaseApplicationConfig> {
-            val applicationConfigResources = this::class.java.getResourceAsStream("/" + properties[PROPERTY_CONFIG_PATH] as String)
-                ?: throw IllegalArgumentException("Resource not found: ${properties[PROPERTY_CONFIG_PATH]}")
-
-            val profiles = (properties[PROPERTY_APPLICATION_PROFILES]!! as String).split(",").toSet()
-
-            // Ref: https://stackoverflow.com/questions/25222327/deserialize-pojos-from-multiple-yaml-documents-in-a-single-file-in-jackson
-            return BufferedInputStream(applicationConfigResources).use { fis ->
-                val parser = YAMLFactory().createParser(fis)
-                objectMapper.readValues(parser, object : TypeReference<BaseApplicationConfig>() {})
-                    .readAll()
-                    .filter { config ->
-                        config.profiles.contains(DEFAULT_APPLICATION_PROFILE) || profiles.any {
-                            config.profiles.contains(it)
-                        }
-                    }.toList()
-            }
+        private fun getApplicationConfigs(properties: Properties, `is`: InputStream): List<BaseApplicationConfig> {
+            return BaseApplicationConfig.fromYAML(
+                injectPropertyValuesInInputStream(`is`, properties),
+                (properties[PROPERTY_APPLICATION_PROFILES]!! as String).split(",").toSet()
+            )
         }
-
-        private val objectMapper = ObjectMapper()
-            .registerKotlinModule()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
         private lateinit var log: Logger
 
@@ -130,24 +112,8 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
         }
     }
 
-    fun configRetrieverOptions(): ConfigRetrieverOptions {
-        val out = ConfigRetrieverOptions()
-        applicationConfigs
-            .map { config -> config.verticles.map { it.toJsonObject() } }
-            .flatten()
-            .map {
-                JsonObject().put(it["className"], it)
-            }
-            .map {
-                ConfigStoreOptions()
-                    .setType("json")
-                    .setConfig(it)
-            }
-            .forEach {
-                out.addStore(it)
-            }
-        return out
-    }
+    fun configRetrieverOptions(): ConfigRetrieverOptions =
+        ConfigRetrieverOptions().setStores(toConfigStoreOptions(applicationConfigs))
 
     override fun handleDeployFailed(vertx: Vertx?, mainVerticle: String?, deploymentOptions: DeploymentOptions?, cause: Throwable?) {
         vertx?.close()
@@ -174,6 +140,51 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
     override fun beforeDeployingVerticle(deploymentOptions: DeploymentOptions?) {
     }
 
+}
+
+private val envRegex = "\\\$\\{(\\w+)(:([^\\\$\\{\\}]*))?\\}".toRegex()
+
+internal fun toConfigStoreOptions(applicationConfigs: List<BaseApplicationConfig>): List<ConfigStoreOptions> =
+    applicationConfigs
+        .map { config -> config.verticles.map { it.toJsonObject() } }
+        .flatten()
+        .map {
+            JsonObject().put(it["className"], it)
+        }
+        .map {
+            ConfigStoreOptions()
+                .setType("json")
+                .setConfig(it)
+        }
+
+internal fun injectPropertyValues(input: String, props: Properties): String = envRegex.findAll(input).let {
+    if (!it.any()) input
+    else {
+        var result = input
+        it.forEach { m ->
+            val envVarName = m.groups[1]?.value
+            if (envVarName == null)
+                return@forEach
+            else {
+                val value = props[envVarName] as String? ?: m.groups[3]?.value ?: ""
+                result = result.replace(m.groups[0]!!.value, value)
+            }
+        }
+        result
+    }
+}
+
+internal fun injectPropertyValuesInInputStream(`is`: InputStream, props: Properties): InputStream {
+    val text = StringBuilder()
+    `is`.bufferedReader().use {
+        try {
+            while(true) {
+                val line = injectPropertyValues(it.readLine(), props)
+                text.appendLine(line)
+            }
+        } catch (_: Exception) { }
+    }
+    return text.toString().byteInputStream()
 }
 
 class MainVerticle : CoroutineVerticle() {

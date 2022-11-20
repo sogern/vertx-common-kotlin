@@ -2,14 +2,11 @@
 
 Convenience classes for Kotlin [Vert.x](https://vertx.io/) applications.
 
-Based on Vert.x v4.3, but should be compatible with future v4.x versions.
+Based on Vert.x 4.3, but should be compatible with future 4.x versions.
 
 **Features**:
 * `application.yaml` config for verticles and logging with profiles similar to [Spring Boot](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.external-config)
 * Setup SLF4J logging
-
-**TODOs**:
-* Support for defining environment variables in `application.yaml`.
 
 
 ## Including in your project
@@ -100,15 +97,16 @@ verticles:
       enabled: true
       config:
         name1: value1
-        name2: value2
-        name3:
+        name2: ${VAL_2}        # Replaced with environment variable, empty if not present
+        name3: ${VAL_3:value3} # Replaced with environment variable, or use fallback if not present
+        name4:
           - list_item1
           - list_item2
-        name4:
-          sub_object_name1: value1
+        name5:
+          sub_object_name1: value3
   - com.example.AnotherVerticle:
       enabled: false
-        
+
 ---
 profiles: profile1,profile2
 
@@ -118,6 +116,8 @@ logging:
 verticles:
   - com.example.AnotherVerticle:
       enabled: true
+      config:
+        name1: value1
 
 ---
 profiles: profile3
