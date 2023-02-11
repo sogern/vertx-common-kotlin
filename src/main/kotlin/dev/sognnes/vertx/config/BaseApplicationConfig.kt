@@ -37,7 +37,6 @@ data class BaseApplicationConfig(
             jsonObject.getJsonArray("verticles")
                 ?.let { it.list as List<LinkedHashMap<String, Any>> }
                 ?.map { VerticleConfig.fromJson(it.keys.first(), JsonObject.mapFrom(it[it.keys.first()] ?: object { })) }
-                ?.toList()
                 ?: emptyList()
         )
     }
