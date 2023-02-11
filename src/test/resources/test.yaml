@@ -6,10 +6,11 @@ verticles:
         name1: value1
         name2: ${VAL_2}        # Replaced with environment variable, empty if not present
         name3: ${VAL_3:value3} # Replaced with environment variable, or use fallback if not present
-        name4:
+        name4: protocol://${VAL_4:host}:${VAL_5:8080}/endpoint # Multiple replacements with static surrounding text
+        name5:
           - list_item1
           - list_item2
-        name5:
+        name6:
           sub_object_name1: value3
   - com.example.AnotherVerticle:
       enabled: false
@@ -31,4 +32,4 @@ profiles: profile3
 
 verticles:
   - com.example.SomeVerticle:
-      enabled: false
+#      enabled: false

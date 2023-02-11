@@ -1,9 +1,6 @@
 package dev.sognnes.vertx.config
 
 import dev.sognnes.vertx.impl.core.*
-import dev.sognnes.vertx.impl.core.injectPropertyValues
-import dev.sognnes.vertx.impl.core.toConfigStoreOptions
-import dev.sognnes.vertx.impl.core.injectPropertyValuesInInputStream
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.core.Vertx
@@ -107,14 +104,17 @@ class ConfigTests {
         listOf(
             "VAL_2" to "value2",
             "VAL_3" to "value3",
+            "VAL_4" to "value4",
+            "VAL_5" to "value5",
         ).forEach { (k, v) ->
             props.setProperty(k, v)
         }
         val updatedInputStream = injectPropertyValuesInInputStream(`is`, props)
         val parsed = BaseApplicationConfig.fromYAML(updatedInputStream)
 
-        val config = parsed[0].verticles[0].config.get()
-        assertEquals("value2", config.getString("name2"))
-        assertEquals("value3", config.getString("name3"))
+        val config = parsed[0].verticles[0].config
+        assertEquals("value2", config?.getString("name2"))
+        assertEquals("value3", config?.getString("name3"))
+        assertEquals("protocol://value4:value5/endpoint", config?.getString("name4"))
     }
 }

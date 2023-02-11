@@ -1,6 +1,7 @@
 package dev.sognnes.vertx.impl.core
 
 import dev.sognnes.vertx.config.BaseApplicationConfig
+import dev.sognnes.vertx.config.VerticleConfig
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.config.ConfigStoreOptions
@@ -16,14 +17,14 @@ import io.vertx.kotlin.core.json.get
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import io.vertx.kotlin.coroutines.await
 import kotlinx.coroutines.launch
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.util.*
 
 // Inspiration from: https://github.com/greyseal/vertx-event-bus/blob/master/src/main/java/com/api/scrubber/launcher/ScrubberLauncher.java
 open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
+
+    private val log by lazy { getLogger<Launcher>() }
 
     companion object {
         private const val PROPERTY_LOGGER_DELEGATE_FACTORY = io.vertx.core.logging.LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME
@@ -78,8 +79,6 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
             )
         }
 
-        private lateinit var log: Logger
-
         private var applicationConfigs = emptyList<BaseApplicationConfig>()
 
         val instance: Launcher = Launcher()
@@ -89,7 +88,7 @@ open class Launcher : VertxCommandLauncher(), VertxLifecycleHooks {
         fun main(args: Array<String>) {
             val properties = initSystemProperties()
 
-            log = LoggerFactory.getLogger(Launcher::class.java)
+            val log = getLogger<Launcher>()
             log.debug("Application starting")
             log.debug("Args:\n${args.joinToString(" ")}")
 
@@ -146,7 +145,7 @@ private val envRegex = "\\\$\\{(\\w+)(:([^\\\$\\{\\}]*))?\\}".toRegex()
 
 internal fun toConfigStoreOptions(applicationConfigs: List<BaseApplicationConfig>): List<ConfigStoreOptions> =
     applicationConfigs
-        .map { config -> config.verticles.map { it.toJsonObject() } }
+        .map { config -> config.verticles.map(VerticleConfig::toJson) }
         .flatten()
         .map {
             JsonObject().put(it["className"], it)
@@ -189,9 +188,7 @@ internal fun injectPropertyValuesInInputStream(`is`: InputStream, props: Propert
 
 class MainVerticle : CoroutineVerticle() {
 
-    companion object {
-        private val log = LoggerFactory.getLogger(MainVerticle::class.java)
-    }
+    private val log by lazy { getLogger<MainVerticle>() }
 
     override suspend fun start() {
         val options = Launcher.instance.configRetrieverOptions()
