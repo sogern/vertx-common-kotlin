@@ -201,25 +201,53 @@ class MainVerticle : CoroutineVerticle() {
             }
             log.info("Deploying verticles")
             val r = it.result()
-            r.fieldNames().forEach { className ->
-                val config: JsonObject = r[className] ?: JsonObject()
-                val enabled: Boolean = config["enabled"] ?: false
-                if (!enabled) {
-                    log.info("Skipping disabled verticle $className")
-                    return@forEach
+
+            val declarations = r.fieldNames()
+                .map { className -> className to (r[className] ?: JsonObject()) }
+                .filter { (className, config) ->
+                    val enabled = config["enabled"] ?: false
+                    if (!enabled) {
+                        log.info("Skipping disabled verticle $className")
+                    }
+                    enabled
                 }
-                launch {
-                    try {
-                        val result = vertx.deployVerticle(
-                            Class.forName(className).canonicalName,
-                            deploymentOptionsOf(config = config["config"])
-                        ).await()
-                        log.info("Deploy success $result")
-                    } catch (t: Throwable) {
-                        log.error("Deploy failure $className", t)
+
+            // Deploy priority Verticles in order
+            // All must deploy successfully
+            declarations
+                .filter { (_, config) -> config.containsKey("priority") }
+                .sortedBy { (_, config) -> config.getInteger("priority") }
+                .forEach { (className, config) ->
+                    launch {
+                        try {
+                            val result = vertx.deployVerticle(
+                                Class.forName(className).canonicalName,
+                                deploymentOptionsOf(config = config["config"])
+                            ).await()
+                            log.info("Deploy success $result")
+                        } catch (t: Throwable) {
+                            log.error("Deploy failure $className", t)
+                            throw t
+                        }
                     }
                 }
-            }
+
+            // Deploy remaining Verticles
+            declarations
+                .filter { (_, config) -> !config.containsKey("priority") }
+                .forEach { (className, config) ->
+                    launch {
+                        try {
+                            val result = vertx.deployVerticle(
+                                Class.forName(className).canonicalName,
+                                deploymentOptionsOf(config = config["config"])
+                            ).await()
+                            log.info("Deploy success $result")
+                        } catch (t: Throwable) {
+                            log.error("Deploy failure $className", t)
+                        }
+                    }
+                }
         }
     }
 }

@@ -58,7 +58,7 @@ class ConfigTests {
         assertEquals("some_other_logback.xml", properties[Launcher.PROPERTY_LOGBACK_CONFIGURATION_FILE])
 
         val configStoreOptions = toConfigStoreOptions(parsed)
-        assertEquals(3, configStoreOptions.size)
+        assertEquals(5, configStoreOptions.size)
 
         ConfigRetriever.create(vertx, ConfigRetrieverOptions().setStores(configStoreOptions)).getConfig {
             if (it.failed()) throw it.cause()
@@ -69,6 +69,9 @@ class ConfigTests {
             val anotherVerticleConfig = result.getJsonObject("com.example.AnotherVerticle")
             assertTrue(anotherVerticleConfig.getBoolean("enabled"))
             assertEquals("value1", anotherVerticleConfig.getJsonObject("config").getString("name1"))
+
+            val importantVerticleConfig = result.getJsonObject("com.example.ImportantVerticle")
+            assertEquals(1, importantVerticleConfig.getJsonObject("config").getInteger("priority"))
         }
     }
 

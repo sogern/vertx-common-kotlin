@@ -41,17 +41,15 @@ data class BaseApplicationConfig(
         )
     }
 
-    fun toJson(): JsonObject {
-        return JsonObject(
-            mapOf(
-                "logging" to JsonObject(mapOf("config" to logging.config)),
-                "profiles" to profiles,
-                "verticles" to JsonArray(
-                    verticles.map { it.toJson() }.toList()
-                )
+    fun toJson() = JsonObject(
+        mapOf(
+            "logging" to JsonObject(mapOf("config" to logging.config)),
+            "profiles" to profiles,
+            "verticles" to JsonArray(
+                verticles.map { it.toJson() }.toList()
             )
         )
-    }
+    )
 }
 
 data class LoggingConfig(
@@ -67,6 +65,7 @@ data class LoggingConfig(
 
 data class VerticleConfig(
     val className: String,
+    val priority: Int?,
     val enabled: Boolean?,
     val config: JsonObject?
 ) {
@@ -74,6 +73,7 @@ data class VerticleConfig(
         fun fromJson(className: String, jsonObject: JsonObject): VerticleConfig =
             VerticleConfig(
                 className,
+                jsonObject.getInteger("priority"),
                 jsonObject.getBoolean("enabled"),
                 jsonObject.getJsonObject("config")
             )
@@ -84,6 +84,7 @@ data class VerticleConfig(
             "className" to className
         )
         // Allow inheritance from profiles higher up
+        priority?.let { props += "priority" to priority }
         enabled?.let { props += "enabled" to enabled }
         config?.let { props += "config" to config }
         return JsonObject(props)

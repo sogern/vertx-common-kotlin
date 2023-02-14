@@ -14,6 +14,11 @@ verticles:
           sub_object_name1: value3
   - com.example.AnotherVerticle:
       enabled: false
+  - com.example.ImportantVerticle:
+      # Verticles with a priority flag set will be handled separately, and before non-prioritised Verticles
+      # They must deploy successfully in order for the remaining Verticles to be deployed
+      priority: 1
+      enabled: true
 
 ---
 profiles: profile1,profile2
@@ -26,6 +31,10 @@ verticles:
       enabled: true
       config:
         name1: value1
+  - com.example.AlsoAnImportantVerticle:
+      # This verticle will be deployed secondly after ImportantVerticle
+      priority: 2
+      enabled: true
 
 ---
 profiles: profile3
